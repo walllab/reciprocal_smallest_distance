@@ -6,75 +6,18 @@ This module follows the NCBI conventions: http://blast.ncbi.nlm.nih.gov/blastcgi
 '''
 
 import cStringIO
-import re
 import math
-
-
-TEST_FASTA = {'GOOD_TEST': '''>ns|id|a long description
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-''',
-              'LONG_TEST': '''>ns|id|a long description
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
->ns|id2|a long description
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-''',
-              'BLANK_IN_TEST': '''>ns|id|a long description
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-  
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-''',
-              'BLANK_START_TEST': '''  
->ns|id|a long description
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-''',
-              'DATA_START_TEST': '''CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
->ns|id|a long description
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-''',
-              'TWO_NAMELINES_TEST': '''>ns|id|a long description
->ns|id2|a long description
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-''',
-              'TRAILING_NAMELINE_TEST': '''>ns|id|a long description
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
-CTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGACTGA
->ns|id2|a long description
-'''}
-
-def test():
-    import traceback, StringIO
-    for name, testFasta in TEST_FASTA.items():
-        try:
-            print
-            print name
-            print 'non-strict'
-            for lines in readFastaLines(StringIO.StringIO(testFasta), strict=False):
-                print lines
-            print 'non-strict, all'
-            for lines in readFastaLines(StringIO.StringIO(testFasta), strict=False, goodOnly=False):
-                print lines
-            print 'strict'
-            for lines in readFastaLines(StringIO.StringIO(testFasta)):
-                print lines
-            print 'readFasta'
-            for lines in readFasta(StringIO.StringIO(testFasta)):
-                print lines
-        except Exception:
-            traceback.print_exc()
 
 
 def idFromName(line):
     '''
     line: a fasta nameline
-    returns: an id parsed from the fasta nameline.  The id is the first whitespace separated token after an optional namespace, etc.  See the examples below.
-    This covers a lot of cases that a sane person would put on a nameline.  So needless to say it covers very few cases.
-    Examples in the form nameline => return value:
+    returns: an id parsed from the fasta nameline.  The id is the first
+    whitespace separated token after an optional namespace, etc.  See the
+    examples below.  This covers a lot of cases that a sane person would put on
+    a nameline.  So needless to say it covers very few cases.  Examples in the
+    form nameline => return value:
+
     id => id
     id desc => id
     >id => id
@@ -88,7 +31,9 @@ def idFromName(line):
     ns|id| => id
     ns|id|desc => id
     ns|id blah|desc => id
+
     Example namelines not covered:
+
     JGI-PSF GENOMES ftp://ftp.jgi-psf.org/pub/JGI_data/Nematostella_vectensis/v1.0/annotation/proteins.Nemve1FilteredModels1.fasta.gz
     >jgi|Nemve1|18|gw.48.1.1
     >jgi|Nemve1|248885|estExt_fgenesh1_pg.C_76820001
@@ -115,7 +60,8 @@ def idFromName(line):
 
 def prettySeq(seq, n=60):
     '''
-    seq: one long bare (no nameline) sequence. e.g. MASNTVSAQGGSNRPVRDFSNIQDVAQFLLFDPIWNEQPGSIVPWKMNREQALAERYPELQTSEPSEDYSGPVESLELLPLEIKLDIMQYLSWEQISWCKHPWLWTRWYKDNVVRVSAITFED
+    seq: one long bare (no nameline) sequence. e.g.
+    MASNTVSAQGGSNRPVRDFSNIQDVAQFLLFDPIWNEQPGSIVPWKMNREQALAERYPELQTSEPSEDYSGPVESLELLPLEIKLDIMQYLSWEQISWCKHPWLWTRWYKDNVVRVSAITFED
     n: maximum length of sequence lines
     returns: seq split over multiple lines, all terminated by newlines.
     '''
@@ -138,36 +84,41 @@ def numSeqsInFastaDb(path):
     return num
 
 
-def readIds(fastaFile, strict=True):
+def readIds(fastaFile):
     '''
     fastaFile: a file-like object or a path to a fasta file
-    yields: id in each nameline.
+    Yields each id in each nameline in each sequence in the fasta file.
     '''
-    for nameline in readNamelines(fastaFile, strict):
+    for nameline in readNamelines(fastaFile):
         yield idFromName(nameline)
 
 
-def readNamelines(fastaFile, strict=True):
+def readNamelines(fastaFile):
     '''
     fastaFile: a file-like object or a path to a fasta file
-    yields: each nameline
+    Yields each nameline in each sequence in the fasta file.
     '''
-    for nameline, seq in readFasta(fastaFile, strict):
+    for nameline, seq in readFasta(fastaFile):
         yield nameline
-        
 
-def readFasta(fastaFile, strict=True):
+
+def readFasta(fastaFile):
     '''
     fastaFile: a file-like object or a path to a fasta file
-    yields: a tuple of (nameline, sequence) for each sequence in the fasta file.
+    Yields a tuple of (nameline, sequence) for each sequence in the fasta file.
+    Newlines are stripped from the nameline and sequence lines, and the sequence
+    lines are concatenated into one long sequence string.
+    Here is an examle (edited for length):
+    ('>sp|P31946|1433B_HUMAN',
+     'MTMDKSELVQKAKLAEQAERYDDMAAAMKAVTEQGHELSNEERNLLSVAYKNVVGARRSSWRVISSIEQKT')
     '''
-    for lines in readFastaLines(fastaFile, strict):
+    for lines in readFastaLines(fastaFile):
         nameline = lines[0].strip()
         seq = ''.join((l.strip() for l in lines[1:]))
         yield nameline, seq
 
 
-def readFastaLines(fastaFile, strict=True, goodOnly=True):
+def readFastaLines(fastaFile):
     '''
     fastaFile: a file-like object or a path to a fasta file
     yields: a seq of fasta sequence lines for each sequence in the fasta file.
@@ -175,13 +126,13 @@ def readFastaLines(fastaFile, strict=True, goodOnly=True):
     '''
     if isinstance(fastaFile, basestring):
         with open(fastaFile) as fh:
-            for lines in _fastaSeqIter(fh, strict, goodOnly):
+            for lines in relaxedFastaSeqIter(fh):
                 yield lines
     else:
-        for lines in _fastaSeqIter(fastaFile, strict, goodOnly):
+        for lines in relaxedFastaSeqIter(fastaFile):
             yield lines
 
-    
+
 def splitSeq(seq):
     '''
     seq: a well-formed fasta sequence string containing a single nameline, including '>' and sequence data lines.
@@ -192,67 +143,123 @@ def splitSeq(seq):
     name = lines[0].strip()
     chars = ''.join([l.strip() for l in lines[1:]])
     return [name, chars]
-    
 
-def _fastaSeqIter(filehandle, strict=True, goodOnly=True):
+
+def relaxedFastaSeqIter(filehandle):
     '''
-    filehandle: file object containing fasta-formatted sequences.
-    strict: if True, raise an exception when a malformed fasta sequence is encountered.
-      A malformed sequence is a sequence with a blank line, a sequence line not preceded by a nameline, or a nameline not followed by a sequence line.
-      E.g. a nameline directly after a nameline, like '>foo\n>bar\nCTAGCTAGGGCA\n'
-    goodOnly: if True, only yield well-formed fasta sequences, ones with a nameline and one or more sequence datalines and no blank lines.
-      if False and strict is False, all sequences, malformed or otherwise, will be yielded.  there will always be at least one (possibly blank) line.
-    Parses the filehandle, yielding one fasta sequence at a time.
-    yields: a seq of fasta sequence lines.  the first line is the nameline.  the other lines are the sequence data lines.  
+    Parse the lines in filehandle, first removing any blank lines, and then
+    yielding all well-formed fasta sequences and ignoring badly-formed seqs.  A
+    well-formed sequence has exactly one nameline followed by one or more
+    sequence lines.
+
+    Well-formed example:
+
+        >sp|P27348|1433T_HUMAN
+        MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR
+        EGAEN
+
+    Badly-formed example (no nameline):
+
+        MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR
+        EGAEN
+
+    Badly-formed example (no sequence lines):
+
+        >sp|P27348|1433T_HUMAN
     '''
-    for lines in _splitOnNamelines(filehandle):
-        if not lines[0] or lines[0][:1] != '>':
-            if strict:
-                raise Exception('FASTA error: sequence must start with a nameline.', lines)
-            elif not goodOnly:
-                yield lines
-        elif len(lines) < 2:
-            if strict:
-                raise Exception('FASTA error: sequence must contain at least one sequence data line.', lines)
-            elif not goodOnly:
-                yield lines
-        elif '' in (line.strip() for line in lines): # contains a blank line
-            if strict:
-                raise Exception('FASTA error: blank lines not allowed')
-            elif not goodOnly:
-                yield lines
-        else: # a good sequence
+    # lines guaranteed to have no blank lines by filterBlanks()
+    # lines guaranteed to have have exactly one nameline as the first
+    # element (except possibly the first lines yielded, which might not
+    # have a nameline if the filehandle starts with a sequence line).
+    for lines in splitFastaOnNamelines(filterBlanks(filehandle)):
+        if lines[0][0] == '>' and len(lines) >= 2:
             yield lines
 
 
-def _splitOnNamelines(filehandle):
+def filterBlanks(lines):
     '''
-    split the lines in filehandle on namelines.
-    yields: seq of lines, where the first line is a nameline (except if filehandle starts with a non-nameline) the other lines are lines until the next nameline
-    or the end of the file.  lines include newlines.  length of yielded seq always contains at least one line.
-    Said another way, the seq of lines will always contain at least one line.  only the first line will ever be a nameline.
+    Yield each line in lines that contains non-whitespace characters.
+    Used to remove blank lines from FASTA files.
+    '''
+    for line in lines:
+        if line.strip():
+            yield line
+
+
+def splitFastaOnNamelines(filehandle):
+    '''
+    Split the lines in filehandle on namelines.  Yields a seq of lines, where
+    the first line in the seq is a nameline (except if filehandle starts with a
+    non-nameline) and the other lines are lines until the next nameline or the
+    end of the file.  Lines include newlines.  The seq of lines will always
+    contain at least one line.  Only the first line will ever be a nameline.
+
+    Example input (note that this is not well-formed fasta, since it starts
+    with a sequence line, has a nameline with no sequence lines, and has blank
+    lines within a sequence):
+
+        VLSSIEQKSNEEGSEEKGPEVREYREKVETELQGVCDTVLGLLDSHLIKEAGDAESRVFY
+        >sp|P31947|1433S_HUMAN
+        >sp|P27348|1433T_HUMAN
+        MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR
+
+        EGAEN
+
+        >sp|P63104|1433Z_HUMAN
+
+        MDKNELVQKAKLAEQAERYDDMAACMKSVTEQGAELSNEERNLLSVAYKNVVGARRSSWR
+        MKGDYYRYLAEVAAGDDKKGIVDQSQQAYQEAFEISKKEMQPTHPIRLGLALNFSVFYYE
+
+    Example yielded output (note how every sequence except the first starts
+    with a nameline):
+        yield ['VLSSIEQKSNEEGSEEKGPEVREYREKVETELQGVCDTVLGLLDSHLIKEAGDAESRVFY\n']
+        yield ['>sp|P31947|1433S_HUMAN\n']
+        yield ['>sp|P27348|1433T_HUMAN\n', 
+        'MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR\n',
+        '\n',
+        'EGAEN\n',
+        '\n']
+        yield ['>sp|P63104|1433Z_HUMAN\n',
+        '\n',
+        'MDKNELVQKAKLAEQAERYDDMAACMKSVTEQGAELSNEERNLLSVAYKNVVGARRSSWR\n',
+        'MKGDYYRYLAEVAAGDDKKGIVDQSQQAYQEAFEISKKEMQPTHPIRLGLALNFSVFYYE\n']
+
+    Well-formed example input (note how the first line of the input is a
+    nameline):
+
+        >sp|P27348|1433T_HUMAN
+        MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR
+        EGAEN
+        >sp|P63104|1433Z_HUMAN
+        MDKNELVQKAKLAEQAERYDDMAACMKSVTEQGAELSNEERNLLSVAYKNVVGARRSSWR
+        MKGDYYRYLAEVAAGDDKKGIVDQSQQAYQEAFEISKKEMQPTHPIRLGLALNFSVFYYE
+
+    Well-formed example output (note how the first element of the first yielded
+    list is a nameline):
+
+        yield ['>sp|P27348|1433T_HUMAN\n', 
+        'MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR\n',
+        'EGAEN\n']
+        yield ['>sp|P63104|1433Z_HUMAN\n',
+        'MDKNELVQKAKLAEQAERYDDMAACMKSVTEQGAELSNEERNLLSVAYKNVVGARRSSWR\n',
+        'MKGDYYRYLAEVAAGDDKKGIVDQSQQAYQEAFEISKKEMQPTHPIRLGLALNFSVFYYE\n']
+
     '''
     lines = []
     for line in filehandle:
-        if line and line[:1] == '>': # a nameline
+        if line and line[0] == '>': # a nameline
             if lines:
-                yield lines # yield last sequence
+                yield lines # yield current sequence
             lines = [line] # start new sequence
-        else: 
-            lines.append(line)
+        else:
+            lines.append(line) # add to current sequence
+
     if lines:
-        yield lines
+        yield lines # yield current sequence
 
 
 def isNameLine(line):
     return line.startswith('>')
-
-
-def _tern(comp, trueVal, falseVal):
-    ''' a tawdry ternary operator '''
-    if comp:
-        return trueVal
-    return falseVal
 
 
 def head(query, n):
@@ -394,6 +401,198 @@ def fastaSeqIterOld(filehandle, strict=True):
         pass
     else:
         raise Exception('FASTA parse error.  Unrecognized state found at end of file.  state=%s'%state)
+
+
+def readFastaLinesOld(fastaFile, strict=True, goodOnly=True, filterBlankLines=False):
+    '''
+    fastaFile: a file-like object or a path to a fasta file
+    yields: a seq of fasta sequence lines for each sequence in the fasta file.
+    the first line is the nameline.  the other lines are the sequence data lines.  lines include newlines.
+    '''
+    if isinstance(fastaFile, basestring):
+        with open(fastaFile) as fh:
+            for lines in _fastaSeqIter(fh, strict, goodOnly, filterBlankLines):
+                yield lines
+    else:
+        for lines in _fastaSeqIter(fastaFile, strict, goodOnly, filterBlankLines):
+            yield lines
+
+
+def _fastaSeqIter(filehandle, strict=True, goodOnly=True, filterBlankLines=False):
+    '''
+    filehandle: file object containing fasta-formatted sequences.
+    strict: if True, raise an exception when a malformed fasta sequence is encountered.
+      A malformed sequence is a sequence with a blank line, a sequence line not preceded by a nameline, or a nameline not followed by a sequence line.
+      E.g. a nameline directly after a nameline, like '>foo\n>bar\nCTAGCTAGGGCA\n'
+    goodOnly: if True, only yield well-formed fasta sequences, ones with a nameline and one or more sequence datalines and no blank lines.
+      if False and strict is False, all sequences, malformed or otherwise, will be yielded.  there will always be at least one (possibly blank) line.
+    filterBlankLines: if True, no blank lines (lines only containing whitespace) will be yielded and blank lines will not raise an exception.
+
+    Parses the filehandle, yielding one fasta sequence at a time.
+    yields: a seq of fasta sequence lines.  the first line is the nameline.  the other lines are the sequence data lines.  
+    '''
+    for lines in _splitOnNamelines(filehandle, filterBlankLines):
+        if not lines[0] or lines[0][0] != '>':
+            if strict:
+                raise Exception('FASTA error: sequence must start with a nameline.', lines)
+            elif not goodOnly:
+                yield lines
+        elif len(lines) < 2:
+            if strict:
+                raise Exception('FASTA error: sequence must contain at least one sequence data line.', lines)
+            elif not goodOnly:
+                yield lines
+        elif '' in (line.strip() for line in lines): # contains a blank line
+            if strict:
+                raise Exception('FASTA error: blank lines not allowed')
+            elif not goodOnly:
+                yield lines
+        else: # a good sequence
+            yield lines
+
+
+def _splitOnNamelines(filehandle, filterBlankLines=False):
+    '''
+    Split the lines in filehandle on namelines.  Example nameline: '>lcl|12345'
+    Yields a seq of lines, where the first line is a nameline (except if filehandle starts with a non-nameline) and the other lines are lines until the next nameline
+    or the end of the file.  Lines include newlines.  The seq of lines will always contain at least one line.  Only the first line will ever be a nameline.
+
+    filterBlankLines: if True, no blank lines (lines only containing whitespace) will be yielded.
+
+
+        >sp|P27348|1433T_HUMAN
+        MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR
+        EGAEN
+
+        >sp|P63104|1433Z_HUMAN
+        MDKNELVQKAKLAEQAERYDDMAACMKSVTEQGAELSNEERNLLSVAYKNVVGARRSSWR
+        MKGDYYRYLAEVAAGDDKKGIVDQSQQAYQEAFEISKKEMQPTHPIRLGLALNFSVFYYE
+    '''
+    lines = []
+    for line in filehandle:
+        if line and line[0] == '>': # a nameline
+            if lines:
+                yield lines # yield current sequence
+            lines = [line] # start new sequence
+        elif not filterBlankLines: # a blank or non-blank line
+            lines.append(line) # add to current sequence
+        elif line.strip(): # a non-blank line
+            lines.append(line) # add to current sequence
+    if lines:
+        yield lines # yield current sequence
+
+
+def _fastaSeqIter2(filehandle):
+    '''
+    Untested code.
+
+    This is a state-machine parser for FASTA formatted files.  The page
+    http://blast.ncbi.nlm.nih.gov/blastcgihelp.shtml describes this format.
+    This parser is tolerant of blank lines that come before a nameline and/or
+    after the sequence lines of a sequence, but not within a sequence.
+
+    This is OK because it contains a blank line after the sequence lines of the
+    first sequence and before the sequence lines of the second sequence:
+
+        >sp|P27348|1433T_HUMAN
+        MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR
+        EGAEN
+
+        >sp|P63104|1433Z_HUMAN
+        MDKNELVQKAKLAEQAERYDDMAACMKSVTEQGAELSNEERNLLSVAYKNVVGARRSSWR
+        MKGDYYRYLAEVAAGDDKKGIVDQSQQAYQEAFEISKKEMQPTHPIRLGLALNFSVFYYE
+
+    This is NOT ok because one sequence contains a blank line after then
+    nameline and before the sequence lines and the other sequence contains a
+    blank line between two sequence lines:
+
+        >sp|P27348|1433T_HUMAN
+
+        MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR
+        EGAEN
+        >sp|P63104|1433Z_HUMAN
+        MDKNELVQKAKLAEQAERYDDMAACMKSVTEQGAELSNEERNLLSVAYKNVVGARRSSWR
+
+        MKGDYYRYLAEVAAGDDKKGIVDQSQQAYQEAFEISKKEMQPTHPIRLGLALNFSVFYYE
+
+    Sequences must start with a nameline.  This is NOT ok:
+
+        MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR
+        EGAEN
+
+    Sequences must contain at least one sequence line.  This is NOT ok:
+
+        >sp|P63104|1433Z_HUMAN
+
+    For every sequence in the fasta file, this parser yields the lines of each
+    sequence in the fasta file.  Here is an example of what it yields:
+
+        ['>sp|P27348|1433T_HUMAN\n',
+        'MEKTELIQKAKLAEQAERYDDMATCMKAVTEQGAELSNEERNLLSVAYKNVVGGRRSAWR\n',
+        'EGAEN\n']
+
+    This parser will raise an Exception
+    '''
+    # parsing states
+    LFN = 'Looking for nameline'
+    LFS = 'Looking for sequence line'
+    LFA = 'Looking for any line' # a sequence or a nameline
+    # line states: blank, nameline (starts with '>'), seq line (starts with
+    # anything else), or EOF.
+    BL = 'blank line'
+    NL = 'nameline'
+    SL = 'sequence line'
+
+    state = LFN
+    lines = []
+    for line in filehandle:
+        linestate = BL if not line.strip() else NL if line[0] == '>' else SL
+        if state == LFN:
+            if linestate == BL:
+                continue
+            elif linestate == NL:
+                lines = [line] # Start a new sequence
+                state = LFS # Found nameline.  Now look for seq lines.
+            elif linestate == SL:
+                raise Exception(PARSING_ERROR, 'Expecting a {} or {}.  Found a {}'.format(BL, NL, SL), line, state, linestate)
+            else:
+                raise Exception(PARSING_ERROR, 'Unrecognized line state', line, state, linestate)
+        elif state == LFS:
+            if linestate == BL:
+                raise Exception(PARSING_ERROR, 'Expecting a {}.  Found a {}'.format(SL, BL), line, state, linestate)
+            elif linestate == NL:
+                raise Exception(PARSING_ERROR, 'Expecting a {}.  Found a {}'.format(SL, NL), line, state, linestate)
+            elif linestate == SL:
+                lines.append(line) # Add to the current sequence
+                state = LFA # Found a seq line, Now look for more seq lines or a new sequence.
+            else:
+                raise Exception(PARSING_ERROR, 'Unrecognized line state', line, state, linestate)
+        elif state == LFA:
+            if linestate == BL:
+                yield lines # Emit the current sequence
+                lines = []
+                state = LFN # Look for a new sequence.
+            elif linestate == NL:
+                yield lines # Emit the current sequence
+                lines = [line] # Start a new sequence
+                state = LFS # Found nameline.  Now look for seq lines.
+            elif linestate == SL:
+                lines.append(line) # Add to the current sequence.
+            else:
+                raise Exception(PARSING_ERROR, 'Unrecognized line state', line, state, linestate)
+        else:
+            raise Exception(PARSING_ERROR, 'Unrecognized parsing state', line, state, linestate)
+
+    # EOF
+    if state == LFN:
+        pass # Done
+    elif state == LFS:
+        raise Exception(PARSING_ERROR, 'Expecting a {}.  Found an EOF.'.format(SL), state)
+    elif state == LFA:
+        yield lines # Emit the current sequence
+        pass # Done
+    else:
+        raise Exception(PARSING_ERROR, 'Unrecognized parsing state', state)
 
 
 
